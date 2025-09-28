@@ -56,7 +56,5 @@ Sem frameworks, sem dependências externas. Leve, rápido e 100% personalizável
 
 
 ## 👀 Veja Online!!! 
-<a href="https://jorgedev1122.github.io/CalcMod/" target="_blank" rel="noopener noreferrer">Calculadora Online</a>
-
-🧪 Teste de alteração no README
+<a href="https://jorgedev1122.github.io/CalcMod/" target="_blank" rel="noopener noreferrer">Acesse a Calculadora Online!</a>
 
