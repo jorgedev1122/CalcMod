@@ -1,9 +1,8 @@
-<h1 align="center">🧮 NitroCalc</h1>
+<h1 align="center">🧮 CalcMod</h1>
 <p align="center">Uma calculadora <strong>modular</strong>, <strong>extensível</strong> e com <strong>múltiplos modos</strong> — tudo isso com uma interface linda e responsiva. 🚀</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/feito%20com-%E2%9D%A4%20HTML%2FCSS%2FJS-blueviolet?style=flat" alt="tecnologias">
-  <img src="https://img.shields.io/badge/Modo-Dark-%230a0a0f.svg?style=flat" alt="darkmode">
   <img src="https://img.shields.io/badge/Calculadora-Modular-green?style=flat" alt="modular">
 </p>
 
@@ -11,7 +10,7 @@
 
 ## 🧩 Sobre o Projeto
 
-**NitroCalc** é uma calculadora completa com suporte a **múltiplos módulos**, incluindo:
+**CalcMod** é uma calculadora completa com suporte a **múltiplos módulos**, incluindo:
 
 - 🧮 Modo Básico (operações padrão)
 - 💰 Financeiro (juros simples, compostos e parcelas)
@@ -28,7 +27,7 @@ Tudo isso com um visual moderno, responsivo, acessível e com suporte a temas pe
 Este projeto foi feito com:
 
 - **HTML5**
-- **CSS3** (responsivo + dark mode)
+- **CSS3**
 - **JavaScript puro (vanilla JS)**
 
 Sem frameworks, sem dependências externas. Leve, rápido e 100% personalizável.
@@ -37,8 +36,8 @@ Sem frameworks, sem dependências externas. Leve, rápido e 100% personalizável
 
 ## 🎨 Funcionalidades
 
-| Modo | Descrição |
-|------|-----------|
+|     Modo     | Descrição |
+|--------------|-----------|
 | `Básico`     | Cálculos padrão: +, −, ×, ÷, %, etc. |
 | `Financeiro` | Juros simples e compostos, cálculo de parcelas. |
 | `Unidades`   | Conversão entre °C↔°F, km↔m, kg↔g. |
@@ -50,27 +49,14 @@ Sem frameworks, sem dependências externas. Leve, rápido e 100% personalizável
 ## 🧠 Destaques
 
 - ✅ Interface intuitiva e moderna
-- 🌓 Tema escuro e temas customizáveis
 - 🔌 Módulos ativáveis/desativáveis
 - 💾 Suporte a salvar e restaurar sessões
 - 🧠 “Modo Nitro” com reconhecimento de padrões (ex: 150/3 → parcelas)
 - 🧪 Sem bibliotecas externas — 100% vanilla
 
----
 
-## 📸 Screenshot
+## 👀 Veja Online!!! 
+<a href="https://seu-site.com" target="_blank" rel="noopener noreferrer">Acesse a calculadora aqui</a>
 
-<p align="center">
-  <img src="Assets/screenshot.png" alt="Screenshot da Calculadora" width="700">
-</p>
+🧪 Teste de alteração no README
 
-> _Dica_: Coloque aqui uma imagem real da aplicação rodando.
-
----
-
-## 🛠️ Como usar
-
-1. Clone o repositório:
-
-```bash
-git clone https://github.com/seu-usuario/nitrocalc.git
