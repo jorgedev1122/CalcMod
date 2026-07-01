@@ -1,293 +1,697 @@
-const exprEl = document.getElementById('expr');
-const resultEl = document.getElementById('result');
-const historyList = document.getElementById('historyList');
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
-let currentExpr = '';
-let history = JSON.parse(localStorage.getItem('calc_history')||'[]');
-let activeModules = JSON.parse(localStorage.getItem('calc_modules')||'{}');
-let nitroActive = JSON.parse(localStorage.getItem('calc_nitro')||'false');
-let theme = localStorage.getItem('calc_theme')||'minimal';
- 
-function updateDisplay(){
-  exprEl.textContent = currentExpr || '0';
-  try{
-    const val = computeExpression(currentExpr);
-    resultEl.textContent = val;
-  }catch(e){ resultEl.textContent = 'Erro'; }
+const exprEl = $("#expr");
+const resultEl = $("#result");
+const historyList = $("#historyList");
+const charCounter = $("#charCounter");
+const toastStack = $("#toastStack");
+
+let currentExpr = "";
+let history = readStorage("calc_history", []);
+let activeModules = readStorage("calc_modules", {});
+let nitroActive = readStorage("calc_nitro", false);
+let theme = localStorage.getItem("calc_theme") || "minimal";
+let soundEnabled = readStorage("calc_sound", false);
+let selectedMode = "basic";
+let commandIndex = 0;
+
+function readStorage(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "null");
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
- 
-function computeExpression(input){
-  if(!input) return '0'; 
-  const sanitized = input.replace(/×/g,'*').replace(/÷/g,'/').replace(/–/g,'-').replace(/−/g,'-');
-  const replaced = sanitized.replace(/%/g, '*0.01');
-  if(!/^[0-9+\-*/(). %]+$/.test(replaced)) throw new Error('invalid'); 
-  if(/\.\./.test(replaced)) throw new Error('invalid');
-  const fn = new Function('return ' + replaced);
+
+function saveStorage(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function computeExpression(input) {
+  if (!input) return "0";
+  const sanitized = input
+    .replace(/×/g, "*")
+    .replace(/÷/g, "/")
+    .replace(/−/g, "-")
+    .replace(/–/g, "-");
+  const replaced = sanitized.replace(/%/g, "*0.01");
+
+  if (!/^[0-9+\-*/(). %]+$/.test(replaced)) throw new Error("invalid");
+  if (/\.\./.test(replaced)) throw new Error("invalid");
+
+  const fn = new Function(`return ${replaced}`);
   const res = fn();
-  if(typeof res === 'number' && !isFinite(res)) throw new Error('infinite');
+  if (typeof res === "number" && !Number.isFinite(res))
+    throw new Error("infinite");
   return roundNice(res);
 }
 
-function roundNice(n){
-  if(n === undefined || n === null) return '0';
-  if(Math.abs(n) < 1e-8) return '0';
-  if(Number.isInteger(n)) return String(n);
-  return String(Number(Math.round(n * 100000)/100000));
+function roundNice(n) {
+  if (n === undefined || n === null || n === "") return "0";
+  const numeric = Number(n);
+  if (Number.isNaN(numeric)) return String(n);
+  if (Math.abs(numeric) < 1e-8) return "0";
+  if (Number.isInteger(numeric)) return String(numeric);
+  return String(Number(Math.round(numeric * 100000) / 100000));
 }
 
-document.querySelectorAll('[data-key]').forEach(btn=>{
-  btn.addEventListener('click', ()=> handleKey(btn.dataset.key));
-});
+function updateDisplay(animate = true) {
+  if (animate) {
+    exprEl.classList.add("is-changing");
+    resultEl.classList.add("is-changing");
+    window.setTimeout(() => {
+      exprEl.classList.remove("is-changing");
+      resultEl.classList.remove("is-changing");
+    }, 170);
+  }
 
-document.getElementById('clearBtn').addEventListener('click', ()=>{ currentExpr=''; updateDisplay(); });
-document.getElementById('backBtn').addEventListener('click', ()=>{ currentExpr = currentExpr.slice(0,-1); updateDisplay(); });
-document.getElementById('pmBtn').addEventListener('click', ()=>{ togglePlusMinus(); });
-document.getElementById('percentBtn').addEventListener('click', ()=>{ currentExpr += '%'; updateDisplay(); });
+  exprEl.textContent = currentExpr || "0";
+  charCounter.textContent = `${currentExpr.length} ${currentExpr.length === 1 ? "caractere" : "caracteres"}`;
 
-function handleKey(k){
-  if(k === '='){ evaluateExpression(); return; }
+  try {
+    resultEl.textContent = computeExpression(currentExpr);
+  } catch {
+    resultEl.textContent = currentExpr ? "" : "0";
+  }
+}
+
+function handleKey(k) {
+  playTone(520, 0.025);
+  if (k === "=") {
+    evaluateExpression();
+    return;
+  }
   currentExpr += k;
   updateDisplay();
   quickNitroDetect();
 }
 
-function evaluateExpression(){
-  try{
+function evaluateExpression() {
+  try {
     const value = computeExpression(currentExpr);
-    addHistory(currentExpr, value);
+    if (currentExpr) addHistory(currentExpr, value);
     currentExpr = String(value);
     updateDisplay();
-  }catch(e){ resultEl.textContent = 'Erro'; }
+    showToast("Resultado calculado", `${currentExpr}`);
+  } catch {
+    resultEl.textContent = "Erro";
+    showToast("Expressão inválida", "Revise a operação e tente novamente.");
+  }
 }
 
-function togglePlusMinus(){
-  // toggle sign of last number
-  const m = currentExpr.match(/(-?\d+\.?\d*)$/);
-  if(m){
-    const num = m[1];
-    const toggled = num.startsWith('-')? num.slice(1): '-' + num;
+function togglePlusMinus() {
+  const match = currentExpr.match(/(-?\d+\.?\d*)$/);
+  if (match) {
+    const num = match[1];
+    const toggled = num.startsWith("-") ? num.slice(1) : `-${num}`;
     currentExpr = currentExpr.slice(0, -num.length) + toggled;
-  } else {
-    currentExpr = '-' + currentExpr;
+  } else if (currentExpr) {
+    currentExpr = `-${currentExpr}`;
   }
   updateDisplay();
 }
 
-document.addEventListener('keydown', (e)=>{
-  const isTypingInInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
-
-  if (isTypingInInput) return; 
-
-  const key = e.key;
-  if(key === 'Enter'){ e.preventDefault(); handleKey('='); }
-  else if(key === 'Backspace'){ e.preventDefault(); currentExpr = currentExpr.slice(0,-1); updateDisplay(); }
-  else if(key === 'Escape'){ e.preventDefault(); currentExpr=''; updateDisplay(); }
-  else if(/^[0-9+\-*/().%]$/.test(key)){
-    e.preventDefault(); handleKey(key);
-  }
-});
-
-function addHistory(expr, value){
-  history.unshift({expr, value, t: Date.now()});
-  if(history.length>20) history.pop();
-  localStorage.setItem('calc_history', JSON.stringify(history));
+function addHistory(expr, value) {
+  history.unshift({ expr, value, t: Date.now() });
+  if (history.length > 20) history.pop();
+  saveStorage("calc_history", history);
   renderHistory();
 }
-function renderHistory(){
-  historyList.innerHTML = '';
-  history.forEach(h=>{
-    const div = document.createElement('div'); div.className='history-item'; div.role='listitem';
-    div.innerHTML = `<div>${h.expr} = ${h.value}</div><div><button class='theme-btn' data-restore='${encodeURIComponent(h.expr)}'>Usar</button></div>`;
-    historyList.appendChild(div);
-  });
-  document.querySelectorAll('[data-restore]').forEach(b=>b.addEventListener('click', ()=>{
-    const e = decodeURIComponent(b.dataset.restore);
-    currentExpr = e; updateDisplay();
-  }));
-}
-document.getElementById('historyToggle').addEventListener('click', ()=>{
-  const p = document.getElementById('historyPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none';
-});
-document.getElementById('clearHistory').addEventListener('click', ()=>{ history = []; localStorage.removeItem('calc_history'); renderHistory(); });
-document.getElementById('restoreSession').addEventListener('click', ()=>{ loadSession(); });
 
+function renderHistory() {
+  historyList.innerHTML = "";
 
-document.querySelectorAll('.module').forEach(m=>{
-  const key = m.dataset.module;
-  if(activeModules[key]) m.classList.add('active');
-  m.addEventListener('click', ()=> toggleModule(key, m));
-  m.addEventListener('keyup', (e)=>{ if(e.key === 'Enter') toggleModule(key,m); });
-});
-
-function toggleModule(key, el){
-  activeModules[key] = !activeModules[key];
-  if(activeModules[key]) el.classList.add('active'); else el.classList.remove('active');
-  localStorage.setItem('calc_modules', JSON.stringify(activeModules));
-  renderModules();
-}
-
-function renderModules(){
-  document.getElementById('financePanel').style.display = activeModules.finance ? 'block' : 'none';
-  document.getElementById('unitPanel').style.display = activeModules.units ? 'block' : 'none';
-  document.getElementById('sciPanel').style.display = activeModules.scientific ? 'block' : 'none';
-  document.getElementById('workPanel').style.display = activeModules.workout ? 'block' : 'none';
-}
-
-
-document.getElementById('simpleBtn').addEventListener('click', ()=>{
-  const A = Number(document.getElementById('finAmount').value)||0;
-  const r = Number(document.getElementById('finRate').value)||0;
-  const t = Number(document.getElementById('finTime').value)||0;
-  const res = A * (1 + (r/100) * t);
-  document.getElementById('financeResult').textContent = `Juros simples: ${roundNice(res)}`;
-});
-
-document.getElementById('compoundBtn').addEventListener('click', ()=>{
-  const A = Number(document.getElementById('finAmount').value)||0;
-  const r = Number(document.getElementById('finRate').value)||0;
-  const t = Number(document.getElementById('finTime').value)||0;
-  const res = A * Math.pow((1 + r/100), t);
-  document.getElementById('financeResult').textContent = `Juros compostos: ${roundNice(res)}`;
-});
-
-document.getElementById('installBtn').addEventListener('click', ()=>{
-  const A = Number(document.getElementById('finAmount').value)||0;
-  const r = Number(document.getElementById('finRate').value)||0;
-  const t = Number(document.getElementById('finTime').value)||1;
-  const total = A * Math.pow((1 + r/100), t);
-  const per = total / t;
-  document.getElementById('financeResult').textContent = `Total: ${roundNice(total)} — ${t}x de ${roundNice(per)}`;
-});
-
-document.getElementById('convertUnit').addEventListener('click', ()=>{
-  const type = document.getElementById('unitType').value;
-  const v = Number(document.getElementById('unitValue').value)||0;
-  let out='0';
-  if(type==='length'){ out = `${v} m = ${v/1000} km | ${v} km = ${v*1000} m`; }
-  else if(type==='weight'){ out = `${v} kg = ${v*1000} g | ${v} g = ${v/1000} kg`; }
-  else if(type==='temp'){ out = `${v}°C = ${(v*9/5)+32}°F | ${v}°F = ${((v-32)*5/9).toFixed(2)}°C`; }
-  document.getElementById('unitResult').textContent = out;
-}); 
-
-document.querySelectorAll('.sci').forEach(b=> b.addEventListener('click', ()=>{
-  const fn = b.dataset.fn;
-  const value = Number(computeExpression(currentExpr));
-  let out = 'Erro';
-  if(isNaN(value)) out = 'Sem valor';
-  else{
-    if(fn==='sqrt') out = Math.sqrt(value);
-    if(fn==='pow'){ const p = prompt('Potência (ex: 2)'); out = Math.pow(value, Number(p)||2); }
-    if(fn==='sin') out = Math.sin(value);
-    if(fn==='cos') out = Math.cos(value);
-  }
-  addHistory(`${fn}(${currentExpr})`, out);
-  currentExpr = String(roundNice(out)); updateDisplay();
-}));
-
-document.getElementById('calcCalories').addEventListener('click', ()=>{
-  const weight = Number(document.getElementById('weightKg').value)||70;
-  const act = document.getElementById('activitySelect').value;
-  const minutes = Number(document.getElementById('timeMin').value)||30;
-  const mets = { running:9.8, cycling:7.5, boxing:12, generic:6 };
-  const met = mets[act]||6;
-  const hours = minutes/60;
-  const cal = met * weight * hours;
-  document.getElementById('workoutResult').textContent = `Estimado: ${roundNice(cal)} kcal`;
-});
-
-const nitroBtn = document.getElementById('nitroBtn');
-nitroBtn.addEventListener('click', ()=>{ nitroActive = !nitroActive; localStorage.setItem('calc_nitro', JSON.stringify(nitroActive)); nitroBtn.setAttribute('aria-pressed', nitroActive); nitroBtn.textContent = nitroActive ? 'Nitro Ativado' : 'Aplicar Nitro'; });
-
-function quickNitroDetect(){
-  if(!nitroActive) return;
-  const m = currentExpr.match(/^(\d+\.?\d*)\s*\/\s*(\d+\.?\d*)$/);
-  if(m){
-    const amount = Number(m[1]); const parts = Number(m[2])||1;
-    const per = roundNice(amount/parts);
-    resultEl.textContent = `Parcelas: ${parts}x de ${per}`;
-  }
-}
-
-function applyTheme(t){
-  document.body.classList.remove('theme-dark','theme-cyber');
-  if(t==='dark') document.body.classList.add('theme-dark');
-  if(t==='cyber') document.body.classList.add('theme-cyber');
-  theme = t; localStorage.setItem('calc_theme', t);
-}
-document.querySelectorAll('.theme-btn[data-theme]').forEach(b=>{
-  b.addEventListener('click', ()=> applyTheme(b.dataset.theme));
-});
-applyTheme(theme);
-
-document.getElementById('saveSessionBtn').addEventListener('click', ()=>{
-  const session = { history, activeModules, theme, nitroActive, expr: currentExpr };
-  localStorage.setItem('calc_full_session', JSON.stringify(session));
-  alert('Sessão salva no localStorage');
-});
-function loadSession(){
-  const s = JSON.parse(localStorage.getItem('calc_full_session')||'null');
-  if(!s) return alert('Nenhuma sessão encontrada');
-  history = s.history||[]; activeModules = s.activeModules||{}; nitroActive = s.nitroActive; currentExpr = s.expr||''; applyTheme(s.theme||'minimal'); renderModules(); renderHistory(); updateDisplay();
-  alert('Sessão carregada');
-}
-document.getElementById('loadSessionBtn').addEventListener('click', loadSession);
-document.getElementById('resetSessionBtn').addEventListener('click', ()=>{ if(confirm('Resetar todas as configurações salvas?')){ localStorage.clear(); location.reload(); } });
-
-const overlay = document.getElementById('overlay');
-document.querySelectorAll('.mode').forEach(m=> m.addEventListener('click', ()=>{
-  document.querySelectorAll('.mode').forEach(x=>x.style.border='1px dashed rgba(0,0,0,0.06)'); m.style.border='2px solid var(--accent)';
-  const mode = m.dataset.mode;
-  if(mode==='basic') activeModules = {};
-  if(mode==='finance') activeModules = { finance: true };
-  if(mode==='units') activeModules = { units: true };
-}));
-document.getElementById('closeOverlay').addEventListener('click', ()=>{ overlay.style.display='none'; localStorage.setItem('calc_modules', JSON.stringify(activeModules)); renderModules(); renderHistory(); updateDisplay(); });
-renderModules(); renderHistory(); updateDisplay();
-
-
-if(Object.keys(activeModules).length===0)
-
-document.addEventListener("DOMContentLoaded", () => {
-  const startBtn = document.getElementById("startBtn");
-  const overlay = document.querySelector(".overlay");
-
-  if (startBtn && overlay) {
-    startBtn.addEventListener("click", () => {
-      overlay.style.display = "none"; 
-    });
-  }
-});
-document.addEventListener("DOMContentLoaded", () => {
-  const overlay = document.querySelector(".overlay");
-  const startBtn = document.getElementById("startBtn");
-  const modeButtons = document.querySelectorAll(".mode");
-
-  let selectedMode = null;
-
-  modeButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      modeButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      selectedMode = btn.innerText; 
-    });
-  });
-
-  startBtn.addEventListener("click", () => {
-    if (!selectedMode) {
-      alert("Selecione um modo antes de começar!");
-      return;
-    }
-
-    localStorage.setItem("calcMode", selectedMode);
- 
-    overlay.style.display = "none";
-  });
-});
-document.addEventListener("keydown", function(event) {
-  if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") {
+  if (!history.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Nenhum cálculo salvo ainda.";
+    historyList.appendChild(empty);
     return;
   }
 
+  history.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "history-item";
+    row.role = "listitem";
 
-});
+    const expression = document.createElement("div");
+    expression.textContent = `${item.expr} = ${item.value}`;
 
+    const button = document.createElement("button");
+    button.className = "control-btn";
+    button.type = "button";
+    button.textContent = "Usar";
+    button.addEventListener("click", () => {
+      currentExpr = item.expr;
+      updateDisplay();
+      showToast("Histórico restaurado", item.expr);
+    });
+
+    row.append(expression, button);
+    historyList.appendChild(row);
+  });
+}
+
+function renderModules() {
+  const panelMap = {
+    finance: $("#financePanel"),
+    units: $("#unitPanel"),
+    scientific: $("#sciPanel"),
+    workout: $("#workPanel"),
+  };
+
+  $$(".module").forEach((module) => {
+    const key = module.dataset.module;
+    const isActive = Boolean(activeModules[key]);
+    module.classList.toggle("active", isActive);
+    module.setAttribute("aria-pressed", String(isActive));
+  });
+
+  Object.entries(panelMap).forEach(([key, panel]) => {
+    panel.hidden = !activeModules[key];
+  });
+}
+
+function toggleModule(key, element, silent = false) {
+  activeModules[key] = !activeModules[key];
+  saveStorage("calc_modules", activeModules);
+  renderModules();
+  playTone(activeModules[key] ? 720 : 380, 0.035);
+
+  if (!silent) {
+    const label = element?.querySelector("strong")?.textContent || key;
+    showToast(
+      activeModules[key] ? "Módulo ativado" : "Módulo desativado",
+      label,
+    );
+  }
+}
+
+function quickNitroDetect() {
+  if (!nitroActive) return;
+  const match = currentExpr.match(/^(\d+\.?\d*)\s*\/\s*(\d+\.?\d*)$/);
+  if (match) {
+    const amount = Number(match[1]);
+    const parts = Number(match[2]) || 1;
+    const per = roundNice(amount / parts);
+    resultEl.textContent = `${parts}x de ${per}`;
+  }
+}
+
+function syncNitroButton() {
+  const nitroBtn = $("#nitroBtn");
+  const nitroStatus = $("#nitroStatus");
+  nitroBtn.setAttribute("aria-pressed", String(nitroActive));
+  nitroBtn.querySelector("span").textContent = nitroActive
+    ? "Nitro Ativado"
+    : "Aplicar Nitro";
+  nitroStatus.classList.toggle("is-on", nitroActive);
+  nitroStatus.querySelector("strong").textContent = nitroActive
+    ? "Nitro on"
+    : "Nitro off";
+}
+
+function applyTheme(nextTheme) {
+  document.body.classList.remove("theme-dark", "theme-cyber");
+  if (nextTheme === "dark") document.body.classList.add("theme-dark");
+  if (nextTheme === "cyber") document.body.classList.add("theme-cyber");
+
+  theme = nextTheme;
+  localStorage.setItem("calc_theme", nextTheme);
+  $$(".theme-btn[data-theme]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === nextTheme);
+  });
+}
+
+function showToast(title, detail = "") {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = `
+    <i data-lucide="sparkle"></i>
+    <div>
+      <strong>${title}</strong>
+      ${detail ? `<small>${detail}</small>` : ""}
+    </div>
+  `;
+  toastStack.appendChild(toast);
+  refreshIcons();
+  window.setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(10px) scale(.98)";
+    window.setTimeout(() => toast.remove(), 220);
+  }, 2600);
+}
+
+function playTone(frequency = 520, duration = 0.03) {
+  if (!soundEnabled) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = frequency;
+  osc.type = "sine";
+  gain.gain.setValueAtTime(0.025, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + duration);
+}
+
+function createRipple(event) {
+  const target = event.currentTarget;
+  const rect = target.getBoundingClientRect();
+  const ripple = document.createElement("span");
+  ripple.className = "ripple";
+  ripple.style.left = `${event.clientX - rect.left}px`;
+  ripple.style.top = `${event.clientY - rect.top}px`;
+  target.appendChild(ripple);
+  ripple.addEventListener("animationend", () => ripple.remove());
+}
+
+function calculateFinance(type) {
+  const amount = Number($("#finAmount").value) || 0;
+  const rate = Number($("#finRate").value) || 0;
+  const time = Number($("#finTime").value) || 0;
+  let text = "";
+
+  if (type === "simple") {
+    text = `Juros simples: ${roundNice(amount * (1 + (rate / 100) * time))}`;
+  }
+
+  if (type === "compound") {
+    text = `Juros compostos: ${roundNice(amount * Math.pow(1 + rate / 100, time))}`;
+  }
+
+  if (type === "installments") {
+    const periods = time || 1;
+    const total = amount * Math.pow(1 + rate / 100, periods);
+    text = `Total: ${roundNice(total)} | ${periods}x de ${roundNice(total / periods)}`;
+  }
+
+  $("#financeResult").textContent = text;
+  showToast("Financeiro atualizado", text);
+}
+
+function convertUnit() {
+  const type = $("#unitType").value;
+  const value = Number($("#unitValue").value) || 0;
+  let output = "0";
+
+  if (type === "length")
+    output = `${value} m = ${value / 1000} km | ${value} km = ${value * 1000} m`;
+  if (type === "weight")
+    output = `${value} kg = ${value * 1000} g | ${value} g = ${value / 1000} kg`;
+  if (type === "temp")
+    output = `${value}°C = ${(value * 9) / 5 + 32}°F | ${value}°F = ${(((value - 32) * 5) / 9).toFixed(2)}°C`;
+
+  $("#unitResult").textContent = output;
+  showToast("Conversão concluída", output);
+}
+
+function runScientific(fn) {
+  const value = Number(computeExpression(currentExpr));
+  let output = "Erro";
+
+  if (Number.isNaN(value)) {
+    output = "Sem valor";
+  } else {
+    if (fn === "sqrt") output = Math.sqrt(value);
+    if (fn === "pow") {
+      const power = prompt("Potência (ex: 2)") || "2";
+      output = Math.pow(value, Number(power) || 2);
+    }
+    if (fn === "sin") output = Math.sin(value);
+    if (fn === "cos") output = Math.cos(value);
+  }
+
+  addHistory(`${fn}(${currentExpr})`, roundNice(output));
+  currentExpr = String(roundNice(output));
+  updateDisplay();
+}
+
+function calcCalories() {
+  const weight = Number($("#weightKg").value) || 70;
+  const activity = $("#activitySelect").value;
+  const minutes = Number($("#timeMin").value) || 30;
+  const mets = { running: 9.8, cycling: 7.5, boxing: 12, generic: 6 };
+  const calories = (mets[activity] || 6) * weight * (minutes / 60);
+  const text = `Estimado: ${roundNice(calories)} kcal`;
+  $("#workoutResult").textContent = text;
+  showToast("Workout calculado", text);
+}
+
+function saveSession() {
+  const session = {
+    history,
+    activeModules,
+    theme,
+    nitroActive,
+    expr: currentExpr,
+    soundEnabled,
+  };
+  saveStorage("calc_full_session", session);
+  showToast("Sessão salva", "Tudo ficou guardado no navegador.");
+}
+
+function loadSession() {
+  const session = readStorage("calc_full_session", null);
+  if (!session) {
+    showToast(
+      "Nenhuma sessão encontrada",
+      "Salve uma sessão antes de carregar.",
+    );
+    return;
+  }
+
+  history = session.history || [];
+  activeModules = session.activeModules || {};
+  nitroActive = Boolean(session.nitroActive);
+  soundEnabled = Boolean(session.soundEnabled);
+  currentExpr = session.expr || "";
+  $("#soundToggle").checked = soundEnabled;
+  applyTheme(session.theme || "minimal");
+  syncNitroButton();
+  renderModules();
+  renderHistory();
+  updateDisplay(false);
+  showToast("Sessão carregada", "Workspace restaurado.");
+}
+
+function resetSession() {
+  if (!confirm("Resetar todas as configurações salvas?")) return;
+  localStorage.clear();
+  showToast("Sessão resetada", "Recarregando interface.");
+  window.setTimeout(() => location.reload(), 600);
+}
+
+const commandActions = [
+  {
+    label: "Limpar calculadora",
+    hint: "Esc",
+    run: () => {
+      currentExpr = "";
+      updateDisplay();
+    },
+  },
+  {
+    label: "Mostrar histórico",
+    hint: "Timeline",
+    run: () => toggleHistory(true),
+  },
+  {
+    label: "Alternar Nitro",
+    hint: "Smart parcelas",
+    run: () => $("#nitroBtn").click(),
+  },
+  {
+    label: "Ativar Financeiro",
+    hint: "Módulo",
+    run: () => setModule("finance", true),
+  },
+  {
+    label: "Ativar Conversor",
+    hint: "Módulo",
+    run: () => setModule("units", true),
+  },
+  {
+    label: "Ativar Científica",
+    hint: "Módulo",
+    run: () => setModule("scientific", true),
+  },
+  {
+    label: "Ativar Workout",
+    hint: "Módulo",
+    run: () => setModule("workout", true),
+  },
+  { label: "Salvar sessão", hint: "Local", run: saveSession },
+  { label: "Carregar sessão", hint: "Local", run: loadSession },
+];
+
+function setModule(key, value) {
+  activeModules[key] = value;
+  saveStorage("calc_modules", activeModules);
+  renderModules();
+  showToast(value ? "Módulo ativado" : "Módulo desativado", key);
+}
+
+function openCommandPalette() {
+  $("#commandBackdrop").hidden = false;
+  $("#commandSearch").value = "";
+  commandIndex = 0;
+  renderCommands();
+  window.setTimeout(() => $("#commandSearch").focus(), 30);
+}
+
+function closeCommandPalette() {
+  $("#commandBackdrop").hidden = true;
+}
+
+function renderCommands() {
+  const query = $("#commandSearch").value.trim().toLowerCase();
+  const list = $("#commandList");
+  const filtered = commandActions.filter((action) =>
+    action.label.toLowerCase().includes(query),
+  );
+  list.innerHTML = "";
+
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Nenhuma ação encontrada.";
+    list.appendChild(empty);
+    return;
+  }
+
+  commandIndex = Math.min(commandIndex, filtered.length - 1);
+
+  filtered.forEach((action, index) => {
+    const button = document.createElement("button");
+    button.className = `command-item ${index === commandIndex ? "is-selected" : ""}`;
+    button.type = "button";
+    button.innerHTML = `<strong>${action.label}</strong><span>${action.hint}</span>`;
+    button.addEventListener("click", () => {
+      action.run();
+      closeCommandPalette();
+    });
+    list.appendChild(button);
+  });
+}
+
+function runSelectedCommand() {
+  const query = $("#commandSearch").value.trim().toLowerCase();
+  const filtered = commandActions.filter((action) =>
+    action.label.toLowerCase().includes(query),
+  );
+  const action = filtered[commandIndex];
+  if (!action) return;
+  action.run();
+  closeCommandPalette();
+}
+
+function toggleHistory(forceOpen = false) {
+  const panel = $("#historyPanel");
+  panel.hidden = forceOpen ? false : !panel.hidden;
+}
+
+function refreshIcons() {
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function bindEvents() {
+  $$("[data-key]").forEach((btn) =>
+    btn.addEventListener("click", () => handleKey(btn.dataset.key)),
+  );
+
+  $("#clearBtn").addEventListener("click", () => {
+    currentExpr = "";
+    updateDisplay();
+    showToast("Display limpo");
+  });
+  $("#backBtn").addEventListener("click", () => {
+    currentExpr = currentExpr.slice(0, -1);
+    updateDisplay();
+  });
+  $("#pmBtn").addEventListener("click", togglePlusMinus);
+  $("#percentBtn").addEventListener("click", () => {
+    currentExpr += "%";
+    updateDisplay();
+  });
+  $("#historyToggle").addEventListener("click", () => toggleHistory());
+  $("#clearHistory").addEventListener("click", () => {
+    history = [];
+    localStorage.removeItem("calc_history");
+    renderHistory();
+    showToast("Histórico limpo");
+  });
+  $("#restoreSession").addEventListener("click", loadSession);
+
+  $$(".module").forEach((module) => {
+    const key = module.dataset.module;
+    module.addEventListener("click", () => toggleModule(key, module));
+    module.addEventListener("keyup", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleModule(key, module);
+      }
+    });
+  });
+
+  $("#simpleBtn").addEventListener("click", () => calculateFinance("simple"));
+  $("#compoundBtn").addEventListener("click", () =>
+    calculateFinance("compound"),
+  );
+  $("#installBtn").addEventListener("click", () =>
+    calculateFinance("installments"),
+  );
+  $("#convertUnit").addEventListener("click", convertUnit);
+  $$(".sci").forEach((btn) =>
+    btn.addEventListener("click", () => runScientific(btn.dataset.fn)),
+  );
+  $("#calcCalories").addEventListener("click", calcCalories);
+
+  $("#nitroBtn").addEventListener("click", () => {
+    nitroActive = !nitroActive;
+    saveStorage("calc_nitro", nitroActive);
+    syncNitroButton();
+    quickNitroDetect();
+    showToast(nitroActive ? "Nitro ativado" : "Nitro desativado");
+  });
+
+  $$(".theme-btn[data-theme]").forEach((btn) =>
+    btn.addEventListener("click", () => applyTheme(btn.dataset.theme)),
+  );
+  $("#saveSessionBtn").addEventListener("click", saveSession);
+  $("#loadSessionBtn").addEventListener("click", loadSession);
+  $("#resetSessionBtn").addEventListener("click", resetSession);
+  $("#settingsToggle").addEventListener("click", () => {
+    $("#settingsPanel").hidden = !$("#settingsPanel").hidden;
+  });
+
+  $("#soundToggle").checked = soundEnabled;
+  $("#soundToggle").addEventListener("change", (event) => {
+    soundEnabled = event.target.checked;
+    saveStorage("calc_sound", soundEnabled);
+    playTone(660, 0.045);
+    showToast(soundEnabled ? "Som ativado" : "Som desativado");
+  });
+
+  $$(".mode").forEach((mode) => {
+    mode.addEventListener("click", () => {
+      $$(".mode").forEach((item) => item.classList.remove("active"));
+      mode.classList.add("active");
+      selectedMode = mode.dataset.mode;
+      playTone(620, 0.03);
+    });
+  });
+
+  $("#closeOverlay").addEventListener("click", () => {
+    if (selectedMode === "basic") activeModules = {};
+    if (selectedMode === "finance") activeModules = { finance: true };
+    if (selectedMode === "units") activeModules = { units: true };
+    saveStorage("calc_modules", activeModules);
+    localStorage.setItem("calc_seen_intro", "true");
+    $("#overlay").style.display = "none";
+    renderModules();
+    showToast("Workspace pronto", "Interface carregada.");
+  });
+
+  $("#commandOpen").addEventListener("click", openCommandPalette);
+  $("#commandBackdrop").addEventListener("click", (event) => {
+    if (event.target.id === "commandBackdrop") closeCommandPalette();
+  });
+  $("#commandSearch").addEventListener("input", renderCommands);
+
+  document.addEventListener("keydown", (event) => {
+    const isTyping = ["INPUT", "TEXTAREA", "SELECT"].includes(
+      event.target.tagName,
+    );
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openCommandPalette();
+      return;
+    }
+
+    if (!$("#commandBackdrop").hidden) {
+      if (event.key === "Escape") closeCommandPalette();
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        commandIndex += 1;
+        renderCommands();
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        commandIndex = Math.max(0, commandIndex - 1);
+        renderCommands();
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runSelectedCommand();
+      }
+      return;
+    }
+
+    if (isTyping) return;
+
+    const key = event.key;
+    if (key === "Enter") {
+      event.preventDefault();
+      handleKey("=");
+    } else if (key === "Backspace") {
+      event.preventDefault();
+      currentExpr = currentExpr.slice(0, -1);
+      updateDisplay();
+    } else if (key === "Escape") {
+      event.preventDefault();
+      currentExpr = "";
+      updateDisplay();
+    } else if (/^[0-9+\-*/().%]$/.test(key)) {
+      event.preventDefault();
+      handleKey(key);
+    }
+  });
+
+  $$("button, .module").forEach((item) =>
+    item.addEventListener("pointerdown", createRipple),
+  );
+
+  document.addEventListener("pointermove", (event) => {
+    const panel = event.target.closest?.(".glass-panel");
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width - 0.5) * 4;
+    const y = ((event.clientY - rect.top) / rect.height - 0.5) * -4;
+    panel.style.transform = `perspective(1200px) rotateX(${y}deg) rotateY(${x}deg)`;
+  });
+
+  document.addEventListener("pointerout", (event) => {
+    const panel = event.target.closest?.(".glass-panel");
+    if (panel) panel.style.transform = "";
+  });
+}
+
+function init() {
+  bindEvents();
+  applyTheme(theme);
+  syncNitroButton();
+  renderModules();
+  renderHistory();
+  updateDisplay(false);
+  refreshIcons();
+
+  if (localStorage.getItem("calc_seen_intro") === "true") {
+    $("#overlay").style.display = "none";
+  } else {
+    $('.mode[data-mode="basic"]').classList.add("active");
+  }
+
+  window.setTimeout(() => $("#splash").classList.add("is-hidden"), 750);
+}
+
+init();

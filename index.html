@@ -1,200 +1,509 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Calculadora Modular</title>
-  <link rel="stylesheet" href="Style.css">
-</head>
-<body id="pageRoot">
-  <div class="app" role="application" aria-label="Aplicação Calculadora Modular">
-    <!-- LEFT: Calculator -->
-    <div class="card" aria-label="painel da calculadora">
-      <div class="display" id="displayBox">
-        <div class="expr" id="expr" aria-live="polite">0</div>
-        <div class="result" id="result" aria-live="polite">0</div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#050505" />
+    <title>CalcMod Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="Style.css" />
+  </head>
+  <body id="pageRoot">
+    <div class="noise" aria-hidden="true"></div>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <div class="splash" id="splash" aria-hidden="true">
+      <div class="splash-mark">
+        <i data-lucide="calculator"></i>
       </div>
+      <div class="splash-copy">
+        <span>CalcMod Studio</span>
+        <small>Carregando workspace</small>
+      </div>
+      <div class="loader-bar"><span></span></div>
+    </div>
 
-      <div style="display:flex; gap:8px; margin-top:12px; align-items:center">
-        <button id="clearBtn" class="theme-btn">C</button>
-        <button id="backBtn" class="theme-btn">⌫</button>
-        <button id="pmBtn" class="theme-btn">±</button>
-        <button id="percentBtn" class="theme-btn">%</button>
-
-        <div style="margin-left:auto; display:flex; gap:8px">
-          <button id="nitroBtn" class="theme-btn" aria-pressed="false">Aplicar Nitro</button>
-          <button id="historyToggle" class="theme-btn">Histórico</button>
+    <main
+      class="shell"
+      role="application"
+      aria-label="Aplicação Calculadora Modular"
+    >
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <i data-lucide="sigma"></i>
+          </div>
+          <div>
+            <p class="eyebrow">CalcMod Studio</p>
+            <h1>Calculadora Modular</h1>
+          </div>
         </div>
-      </div>
 
-      <div class="keys" role="grid" aria-label="teclado da calculadora" id="keys">
-        <!-- row 1 -->
-        <button class="key" data-key="7">7</button>
-        <button class="key" data-key="8">8</button>
-        <button class="key" data-key="9">9</button>
-        <button class="key op" data-key="/">÷</button>
-        <!-- row 2 -->
-        <button class="key" data-key="4">4</button>
-        <button class="key" data-key="5">5</button>
-        <button class="key" data-key="6">6</button>
-        <button class="key op" data-key="*">×</button>
-        <!-- row 3 -->
-        <button class="key" data-key="1">1</button>
-        <button class="key" data-key="2">2</button>
-        <button class="key" data-key="3">3</button>
-        <button class="key op" data-key="-">−</button>
-        <!-- row 4 -->
-        <button class="key" data-key="0">0</button>
-        <button class="key" data-key=".">.</button>
-        <button class="key" id="equals" data-key="=">=</button>
-        <button class="key op" data-key="+">+</button>
-      </div>
-
-      <div id="historyPanel" class="panel" style="display:none">
-        <div class="mini">Histórico (últimos cálculos)</div>
-        <div class="history" id="historyList" role="list"></div>
-        <div style="display:flex; gap:8px; margin-top:8px">
-          <button id="clearHistory" class="theme-btn">Limpar Histórico</button>
-          <button id="restoreSession" class="theme-btn">Restaurar Sessão</button>
+        <div class="topbar-actions">
+          <button
+            class="icon-btn"
+            id="commandOpen"
+            data-tooltip="Command Palette (Ctrl + K)"
+            aria-label="Abrir command palette"
+          >
+            <i data-lucide="command"></i>
+          </button>
+          <button
+            class="icon-btn"
+            id="settingsToggle"
+            data-tooltip="Configurações"
+            aria-label="Abrir configurações"
+          >
+            <i data-lucide="sliders-horizontal"></i>
+          </button>
         </div>
+      </header>
+
+      <section class="workspace">
+        <section
+          class="calculator-panel glass-panel"
+          aria-label="Painel da calculadora"
+        >
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Console</p>
+              <h2>Compute</h2>
+            </div>
+            <div class="status-pill" id="nitroStatus">
+              <span></span>
+              <strong>Nitro off</strong>
+            </div>
+          </div>
+
+          <section
+            class="display"
+            id="displayBox"
+            aria-label="Display da calculadora"
+          >
+            <div class="display-meta">
+              <span>Histórico atual</span>
+              <span id="charCounter">0 caracteres</span>
+            </div>
+            <div class="expr" id="expr" aria-live="polite">0</div>
+            <div class="result-wrap">
+              <div class="result" id="result" aria-live="polite">0</div>
+              <span class="display-cursor" aria-hidden="true"></span>
+            </div>
+          </section>
+
+          <div class="quick-actions">
+            <button
+              id="clearBtn"
+              class="control-btn"
+              data-tooltip="Limpar (Esc)"
+            >
+              <i data-lucide="rotate-ccw"></i><span>C</span>
+            </button>
+            <button
+              id="backBtn"
+              class="control-btn"
+              data-tooltip="Apagar (Backspace)"
+            >
+              <i data-lucide="delete"></i><span>Del</span>
+            </button>
+            <button
+              id="pmBtn"
+              class="control-btn"
+              data-tooltip="Alternar sinal"
+            >
+              <i data-lucide="plus-minus"></i><span>±</span>
+            </button>
+            <button
+              id="percentBtn"
+              class="control-btn"
+              data-tooltip="Porcentagem"
+            >
+              <i data-lucide="percent"></i><span>%</span>
+            </button>
+            <button
+              id="nitroBtn"
+              class="control-btn accent-control"
+              aria-pressed="false"
+              data-tooltip="Detecta padrões como 150/3"
+            >
+              <i data-lucide="zap"></i><span>Aplicar Nitro</span>
+            </button>
+            <button
+              id="historyToggle"
+              class="control-btn"
+              data-tooltip="Mostrar histórico"
+            >
+              <i data-lucide="history"></i><span>Histórico</span>
+            </button>
+          </div>
+
+          <div
+            class="keys"
+            role="grid"
+            aria-label="Teclado da calculadora"
+            id="keys"
+          >
+            <button class="key" data-key="7">7</button>
+            <button class="key" data-key="8">8</button>
+            <button class="key" data-key="9">9</button>
+            <button class="key op" data-key="/">÷</button>
+            <button class="key" data-key="4">4</button>
+            <button class="key" data-key="5">5</button>
+            <button class="key" data-key="6">6</button>
+            <button class="key op" data-key="*">×</button>
+            <button class="key" data-key="1">1</button>
+            <button class="key" data-key="2">2</button>
+            <button class="key" data-key="3">3</button>
+            <button class="key op" data-key="-">−</button>
+            <button class="key zero" data-key="0">0</button>
+            <button class="key" data-key=".">.</button>
+            <button class="key equals" id="equals" data-key="=">=</button>
+            <button class="key op" data-key="+">+</button>
+          </div>
+
+          <aside id="historyPanel" class="panel history-panel" hidden>
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Timeline</p>
+                <h3>Histórico</h3>
+              </div>
+              <button
+                id="clearHistory"
+                class="icon-btn small"
+                data-tooltip="Limpar histórico"
+                aria-label="Limpar histórico"
+              >
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
+            <div class="history" id="historyList" role="list"></div>
+            <button id="restoreSession" class="control-btn wide">
+              <i data-lucide="archive-restore"></i
+              ><span>Restaurar sessão salva</span>
+            </button>
+          </aside>
+        </section>
+
+        <aside class="modules-sidebar glass-panel" aria-label="Loja de módulos">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Module Store</p>
+              <h2>Loja de Módulos</h2>
+            </div>
+          </div>
+
+          <div class="modules-list" id="modulesList" role="list">
+            <article
+              class="module"
+              data-module="finance"
+              tabindex="0"
+              role="button"
+              aria-pressed="false"
+            >
+              <div class="module-icon"><i data-lucide="landmark"></i></div>
+              <div class="module-copy">
+                <strong>Modo Financeiro</strong>
+                <span>Juros, parcelas e projeções rápidas.</span>
+              </div>
+              <span class="badge">Finanças</span>
+              <span class="switch" aria-hidden="true"></span>
+            </article>
+
+            <article
+              class="module"
+              data-module="units"
+              tabindex="0"
+              role="button"
+              aria-pressed="false"
+            >
+              <div class="module-icon"><i data-lucide="ruler"></i></div>
+              <div class="module-copy">
+                <strong>Conversor de Unidades</strong>
+                <span>Comprimento, peso e temperatura.</span>
+              </div>
+              <span class="badge">Medidas</span>
+              <span class="switch" aria-hidden="true"></span>
+            </article>
+
+            <article
+              class="module"
+              data-module="scientific"
+              tabindex="0"
+              role="button"
+              aria-pressed="false"
+            >
+              <div class="module-icon"><i data-lucide="atom"></i></div>
+              <div class="module-copy">
+                <strong>Científica</strong>
+                <span>Raiz, potência, seno e cosseno.</span>
+              </div>
+              <span class="badge">Científica</span>
+              <span class="switch" aria-hidden="true"></span>
+            </article>
+
+            <article
+              class="module"
+              data-module="workout"
+              tabindex="0"
+              role="button"
+              aria-pressed="false"
+            >
+              <div class="module-icon"><i data-lucide="activity"></i></div>
+              <div class="module-copy">
+                <strong>Modo Workout</strong>
+                <span>Estimativa de calorias por atividade.</span>
+              </div>
+              <span class="badge">Fitness</span>
+              <span class="switch" aria-hidden="true"></span>
+            </article>
+          </div>
+
+          <div id="modulePanels" class="module-panels">
+            <section class="panel module-panel" id="financePanel" hidden>
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Finance</p>
+                  <h3>Modo Financeiro</h3>
+                </div>
+                <i data-lucide="wallet-cards"></i>
+              </div>
+              <div class="form-grid three">
+                <input
+                  id="finAmount"
+                  type="number"
+                  placeholder="Valor"
+                  aria-label="Valor financeiro"
+                />
+                <input
+                  id="finRate"
+                  type="number"
+                  placeholder="Taxa %"
+                  aria-label="Taxa percentual"
+                />
+                <input
+                  id="finTime"
+                  type="number"
+                  placeholder="Períodos"
+                  aria-label="Períodos"
+                />
+              </div>
+              <div class="segmented">
+                <button id="simpleBtn" class="control-btn">
+                  Juros simples
+                </button>
+                <button id="compoundBtn" class="control-btn">Compostos</button>
+                <button id="installBtn" class="control-btn">Parcelas</button>
+              </div>
+              <output class="result-chip" id="financeResult"></output>
+            </section>
+
+            <section class="panel module-panel" id="unitPanel" hidden>
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Convert</p>
+                  <h3>Conversor</h3>
+                </div>
+                <i data-lucide="repeat-2"></i>
+              </div>
+              <div class="form-grid">
+                <select id="unitType" aria-label="Tipo de unidade">
+                  <option value="length">Comprimento (m ↔ km)</option>
+                  <option value="weight">Peso (kg ↔ g)</option>
+                  <option value="temp">Temperatura (°C ↔ °F)</option>
+                </select>
+                <input
+                  id="unitValue"
+                  type="number"
+                  placeholder="Valor"
+                  aria-label="Valor para conversão"
+                />
+                <button id="convertUnit" class="control-btn">Converter</button>
+              </div>
+              <output class="result-chip" id="unitResult"></output>
+            </section>
+
+            <section class="panel module-panel" id="sciPanel" hidden>
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Lab</p>
+                  <h3>Módulo Científico</h3>
+                </div>
+                <i data-lucide="flask-conical"></i>
+              </div>
+              <div class="sci-grid">
+                <button class="control-btn sci" data-fn="sqrt">√x</button>
+                <button class="control-btn sci" data-fn="pow">xⁿ</button>
+                <button class="control-btn sci" data-fn="sin">sin</button>
+                <button class="control-btn sci" data-fn="cos">cos</button>
+              </div>
+              <p class="hint">Aplica a função ao resultado atual.</p>
+            </section>
+
+            <section class="panel module-panel" id="workPanel" hidden>
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">Energy</p>
+                  <h3>Modo Workout</h3>
+                </div>
+                <i data-lucide="heart-pulse"></i>
+              </div>
+              <div class="form-grid">
+                <input
+                  id="weightKg"
+                  type="number"
+                  placeholder="Peso (kg)"
+                  aria-label="Peso em kg"
+                />
+                <select id="activitySelect" aria-label="Atividade">
+                  <option value="running">Corrida</option>
+                  <option value="cycling">Ciclismo</option>
+                  <option value="boxing">Boxe</option>
+                  <option value="generic">Genérico</option>
+                </select>
+                <input
+                  id="timeMin"
+                  type="number"
+                  placeholder="Minutos"
+                  aria-label="Tempo em minutos"
+                />
+                <button id="calcCalories" class="control-btn">Calcular</button>
+              </div>
+              <output class="result-chip" id="workoutResult"></output>
+            </section>
+          </div>
+
+          <section class="settings-card" id="settingsPanel" hidden>
+            <div class="section-title">
+              <div>
+                <p class="eyebrow">Session</p>
+                <h3>Configurações</h3>
+              </div>
+              <i data-lucide="settings-2"></i>
+            </div>
+            <div class="theme-row" aria-label="Temas">
+              <button class="theme-btn" data-theme="minimal">Auto</button>
+              <button class="theme-btn" data-theme="dark">Dark</button>
+              <button class="theme-btn" data-theme="cyber">Ice</button>
+            </div>
+            <label class="toggle-row">
+              <span>
+                <strong>Efeitos sonoros</strong>
+                <small>Feedback sutil nos botões.</small>
+              </span>
+              <input id="soundToggle" type="checkbox" />
+            </label>
+            <div class="session-actions">
+              <button id="saveSessionBtn" class="control-btn">
+                <i data-lucide="save"></i><span>Salvar</span>
+              </button>
+              <button id="loadSessionBtn" class="control-btn">
+                <i data-lucide="download"></i><span>Carregar</span>
+              </button>
+              <button id="resetSessionBtn" class="control-btn danger">
+                <i data-lucide="refresh-cw"></i><span>Resetar</span>
+              </button>
+            </div>
+            <div class="shortcut-grid">
+              <span><kbd>Enter</kbd> Resultado</span>
+              <span><kbd>Esc</kbd> Limpar</span>
+              <span><kbd>Ctrl K</kbd> Comandos</span>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <div
+      class="overlay"
+      id="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modeTitle"
+    >
+      <div class="modal glass-panel">
+        <div class="modal-icon"><i data-lucide="sparkles"></i></div>
+        <p class="eyebrow">Onboarding</p>
+        <h2 id="modeTitle">Escolha um modo</h2>
+        <p class="modal-text">
+          Selecione um workspace inicial. Você pode ativar ou desativar módulos
+          a qualquer momento.
+        </p>
+        <div class="modes">
+          <button class="mode" data-mode="basic">
+            <i data-lucide="calculator"></i>
+            <span>Calculadora Básica</span>
+          </button>
+          <button class="mode" data-mode="finance">
+            <i data-lucide="landmark"></i>
+            <span>Ferramentas Financeiras</span>
+          </button>
+          <button class="mode" data-mode="units">
+            <i data-lucide="ruler"></i>
+            <span>Conversor de Unidades</span>
+          </button>
+        </div>
+        <button id="closeOverlay" class="primary-btn">Começar</button>
       </div>
     </div>
 
-    <!-- RIGHT: Modules -->
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center">
-        <div>
-          <h3 style="margin:0">Loja de Módulos</h3>
-          <div class="mini">Ative as ferramentas que quiser. Salvo no seu navegador.</div>
+    <div class="command-backdrop" id="commandBackdrop" hidden>
+      <div
+        class="command-palette glass-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command Palette"
+      >
+        <div class="command-input">
+          <i data-lucide="search"></i>
+          <input
+            id="commandSearch"
+            type="search"
+            placeholder="Buscar ações, módulos e sessões..."
+            autocomplete="off"
+          />
         </div>
-        <div class="themes">
-          <button class="theme-btn" data-theme="minimal">Minimal</button>
-          <button class="theme-btn" data-theme="dark">Escuro</button>
-          <button class="theme-btn" data-theme="cyber">Cyber</button>
-        </div>
-      </div>
-
-      <div class="modules-list" id="modulesList" role="list">
-        <div class="module" data-module="finance" tabindex="0">Modo Financeiro</div>
-        <div class="module" data-module="units" tabindex="0">Conversor de Unidades</div>
-        <div class="module" data-module="scientific" tabindex="0">Científica (sqrt, pow, sin, cos)</div>
-        <div class="module" data-module="workout" tabindex="0">Modo Workout</div>
-      </div>
-
-      <div id="modulePanels" class="panel">
-        <!-- finance panel -->
-        <div class="panel" id="financePanel" style="display:none">
-          <h4>Modo Financeiro</h4>
-          <div class="mini">Juros simples/compostos e parcelas</div>
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <input id="finAmount" type="number" placeholder="Valor" aria-label="valor financeiro" />
-            <input id="finRate" type="number" placeholder="Taxa %" aria-label="taxa percentual" />
-            <input id="finTime" type="number" placeholder="Períodos" aria-label="períodos" />
-          </div>
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <button id="simpleBtn" class="theme-btn">Juros Simples</button>
-            <button id="compoundBtn" class="theme-btn">Juros Compostos</button>
-            <button id="installBtn" class="theme-btn">Parcelas</button>
-          </div>
-          <div class="mini" id="financeResult"></div>
-        </div>
-
-        <!-- unit panel -->
-        <div class="panel" id="unitPanel" style="display:none">
-          <h4>Conversor de Unidades</h4>
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <select id="unitType">
-              <option value="length">Comprimento (m ↔ km)</option>
-              <option value="weight">Peso (kg ↔ g)</option>
-              <option value="temp">Temperatura (°C ↔ °F)</option>
-            </select>
-            <input id="unitValue" type="number" placeholder="Valor" />
-            <button id="convertUnit" class="theme-btn">Converter</button>
-          </div>
-          <div class="mini" id="unitResult"></div>
-        </div>
-
-        <!-- scientific panel -->
-        <div class="panel" id="sciPanel" style="display:none">
-          <h4>Módulo Científico</h4>
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <button class="theme-btn sci" data-fn="sqrt">√</button>
-            <button class="theme-btn sci" data-fn="pow">xʸ</button>
-            <button class="theme-btn sci" data-fn="sin">sin</button>
-            <button class="theme-btn sci" data-fn="cos">cos</button>
-          </div>
-          <div class="mini">Clique numa função para aplicar ao resultado atual.</div>
-        </div>
-
-        <!-- workout panel -->
-        <div class="panel" id="workPanel" style="display:none">
-          <h4>Modo Workout</h4>
-          <div class="mini">Estime calorias gastas</div>
-          <div style="display:flex; gap:8px; margin-top:8px">
-            <input id="weightKg" type="number" placeholder="Peso (kg)" />
-            <select id="activitySelect">
-              <option value="running">Corrida</option>
-              <option value="cycling">Ciclismo</option>
-              <option value="boxing">Boxe</option>
-              <option value="generic">Genérico</option>
-            </select>
-            <input id="timeMin" type="number" placeholder="Minutos" />
-            <button id="calcCalories" class="theme-btn">Calcular</button>
-          </div>
-          <div class="mini" id="workoutResult"></div>
-        </div>
-      </div>
-
-      <div style="margin-top:12px">
-        <div class="mini">Sessão & Configurações</div>
-        <div style="display:flex; gap:8px; margin-top:8px">
-          <button id="saveSessionBtn" class="theme-btn">Salvar Sessão</button>
-          <button id="loadSessionBtn" class="theme-btn">Carregar Sessão</button>
-          <button id="resetSessionBtn" class="theme-btn">Resetar</button>
-        </div>
-      </div>
-
-      <div style="margin-top:14px" class="mini muted">Teclado: Enter = =, Backspace = ⌫, Esc = C. Nitro: quando ativo detecta padrões como "150/3" para sugerir parcelas.</div>
-    </div>
-  </div>
-
-  <!-- initial overlay for quick mode select -->
-  <div class="overlay" id="overlay">
-    <div class="modal card">
-      <h2>Escolha um modo</h2>
-      <div class="mini">Selecione o que quer usar — depois dá pra ativar/desativar módulos.</div>
-      <div class="modes">
-        <div class="mode" data-mode="basic">Calculadora Básica</div>
-        <div class="mode" data-mode="finance">Ferramentas Financeiras</div>
-        <div class="mode" data-mode="units">Conversor de Unidades</div>
-      </div>
-      <div style="margin-top:12px; display:flex; justify-content:flex-end">
-        <button id="closeOverlay" class="theme-btn">Começar</button>
+        <div class="command-list" id="commandList" role="listbox"></div>
       </div>
     </div>
-  </div>
-<script src="Script.js"></script>
-<!-- aqui fecha sua div principal -->
-</div>
-<!-- créditos -->
-  ...
-  </div> <!-- fecha a div .app -->
 
-<!-- substitua o bloco atual dos créditos por este -->
-<footer class="creditos">
-  <details>
-    <summary>🡻 Créditos: Jorge Enrique 🡻</summary>
+    <div
+      class="toast-stack"
+      id="toastStack"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
 
-    <div class="links">
-      <a href="https://www.instagram.com/j0rge.2211/" target="_blank" rel="noopener">
-        <img src="./Assets/Instagram.Logo.png" alt="Instagram" />
-      </a>
+    <footer class="creditos">
+      <details>
+        <summary>Créditos: Jorge Enrique</summary>
+        <div class="links">
+          <a
+            href="https://www.instagram.com/j0rge.2211/"
+            target="_blank"
+            rel="noopener"
+            aria-label="Instagram"
+          >
+            <img src="./Assets/Instagram.Logo.png" alt="" />
+          </a>
+          <a
+            href="https://github.com/jorgedev1122"
+            target="_blank"
+            rel="noopener"
+            aria-label="GitHub"
+          >
+            <img src="./Assets/Github.logo.png" alt="" />
+          </a>
+        </div>
+      </details>
+    </footer>
 
-      <a href="https://github.com/jorgedev1122" target="_blank" rel="noopener">
-        <img src="./Assets/Github.logo.png" alt="GitHub" />
-      </a>
-    </div>
-  </details>
-</footer>
-
-
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="Script.js"></script>
+  </body>
+</html>
